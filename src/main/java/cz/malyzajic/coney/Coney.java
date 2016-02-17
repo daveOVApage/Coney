@@ -4,10 +4,14 @@ import com.sorcix.sirc.Channel;
 import com.sorcix.sirc.IrcAdaptor;
 import com.sorcix.sirc.IrcConnection;
 import com.sorcix.sirc.IrcDebug;
+import com.sorcix.sirc.NickNameException;
+import com.sorcix.sirc.PasswordException;
 import com.sorcix.sirc.User;
 import cz.malyzajic.coney.bsh.BshBot;
+import cz.malyzajic.coney.java.WebUpdateChecker;
 import cz.malyzajic.coney.php.PhpBot;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -168,7 +172,7 @@ public class Coney {
             Channel labka = ic.createChannel(channelName);
             labka.join();
             createAndPrepareBots(labka);
-        } catch (Exception ex) {
+        } catch (IOException | NickNameException | PasswordException ex) {
             Logger.getLogger(Coney.class.getName()).log(Level.SEVERE, null, ex);
         }
 
@@ -195,7 +199,6 @@ public class Coney {
 
                 String type = null;
                 String path = null;
-                String nick = sectionName;
                 boolean takeAll = false;
 
                 Iterator<String> keys = section.getKeys();
@@ -218,8 +221,8 @@ public class Coney {
                         }
                     }
                 }
-                if (!Utils.isEmpty(path) && !Utils.isEmpty(type) && !Utils.isEmpty(nick)) {
-                    Bot bot = createBot(type, path, nick, takeAll);
+                if (!Utils.isEmpty(type) && !Utils.isEmpty(sectionName)) {
+                    Bot bot = createBot(type, path, sectionName, takeAll, labka);
                     bot.setChannel(labka);
                     System.out.println("add new Bot: " + bot);
                     bots.add(bot);
@@ -229,14 +232,29 @@ public class Coney {
         }
     }
 
-    private Bot createBot(String type, String path, String nick, boolean takeAll) {
+    private Bot createBot(String type, String path, String nick, boolean takeAll, Channel channel) {
         Bot bot = null;
-        if ("php".equalsIgnoreCase(type)) {
-            bot = new PhpBot(nick, path);
-            bot.setTakeAll(takeAll);
-        } else if ("bsh".equalsIgnoreCase(type)) {
-            bot = new BshBot(nick, path);
-            bot.setTakeAll(takeAll);
+        if (null != type) {
+            switch (type) {
+                case "php":
+                    if (!Utils.isEmpty(path)) {
+                        bot = new PhpBot(nick, path);
+                        bot.setTakeAll(takeAll);
+                    }
+                    break;
+                case "bsh":
+                    if (!Utils.isEmpty(path)) {
+                        bot = new BshBot(nick, path);
+                        bot.setTakeAll(takeAll);
+                    }
+                    break;
+                case "web":
+                    bot = new WebUpdateChecker(nick);
+                    bot.setChannel(channel);
+                    break;
+                default:
+                    break;
+            }
         }
 
         return bot;

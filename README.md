@@ -19,3 +19,7 @@ INI files example:
 [bot_foo_nick2]
     type = bsh
     path = bots/test2.bsh
+
+[webUpdateChacker]
+    ; kontroluje zmeny na Labka.cz ... co 2 minuty
+    type = web
