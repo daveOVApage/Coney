@@ -56,7 +56,7 @@ public class Coney {
         try {
             options = new Options();
 
-            options.addOption("h", false, "help");
+            options.addOption("help", false, "help");
             options.addOption("n", true, "nick");
             options.addOption("d", false, "debug, default false");
             options.addOption("ch", true, "channel name");
@@ -66,7 +66,7 @@ public class Coney {
             CommandLineParser parser = new DefaultParser();
             CommandLine line = parser.parse(options, args);
 
-            if (line.hasOption("h")) {
+            if (line.hasOption("help")) {
                 HelpFormatter formatter = new HelpFormatter();
                 formatter.printHelp("Coney", options);
             }
