@@ -143,6 +143,7 @@ public class Coney {
                     if (message != null && message.toLowerCase().startsWith(nickLowerCase)) {
                         if ("bots".equals(message.substring(nickLowerCase.length()).trim())) {
                             StringBuilder str = new StringBuilder();
+                            str.append("Running bots: ");
                             int i = 0;
                             for (Bot bot : bots) {
                                 if (i++ != 0) {
