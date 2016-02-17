@@ -141,6 +141,20 @@ public class Coney {
                         String message) {
                     Bot currentBot = null;
                     if (message != null && message.toLowerCase().startsWith(nickLowerCase)) {
+                        if ("bots".equals(message.substring(nickLowerCase.length()).trim())) {
+                            StringBuilder str = new StringBuilder();
+                            int i = 0;
+                            for (Bot bot : bots) {
+                                if (i++ != 0) {
+                                    str.append(", ");
+                                }
+                                str.append(bot.getNick());
+                            }
+
+                            target.send(str.toString());
+                            return;
+                        }
+
                         currentBot = findBot(message.substring(nickLowerCase.length()));
                         if (currentBot != null) {
                             String response = currentBot.getResponse(
@@ -150,8 +164,6 @@ public class Coney {
                             if (response != null && !response.isEmpty()) {
                                 target.sendMessage(response);
                             }
-                        } else {
-                            target.sendMessage(" Boti nezabrali. mas tam preklep, a nebo pises zbytecnosti");
                         }
 
                     }
