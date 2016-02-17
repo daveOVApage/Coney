@@ -6,6 +6,7 @@ usage: Coney
  -f <arg>    bots INI file
  -h <arg>    irc host, default irc.freenode.net
  -n <arg>    nick
+ -help       print help
 
 
 INI files example:
