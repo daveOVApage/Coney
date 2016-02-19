@@ -1,12 +1,14 @@
 # Coney
 
 usage: Coney
+ -a          automatic reconnect after disconnect
  -ch <arg>   channel name
  -d          debug, default false
  -f <arg>    bots INI file
  -h <arg>    irc host, default irc.freenode.net
+ -help       help
  -n <arg>    nick
- -help       print help
+
 
 
 INI files example:

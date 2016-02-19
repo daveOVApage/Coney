@@ -1,12 +1,10 @@
 package cz.malyzajic.coney;
 
 import com.sorcix.sirc.Channel;
-import com.sorcix.sirc.IrcAdaptor;
 import com.sorcix.sirc.IrcConnection;
 import com.sorcix.sirc.IrcDebug;
 import com.sorcix.sirc.NickNameException;
 import com.sorcix.sirc.PasswordException;
-import com.sorcix.sirc.User;
 import cz.malyzajic.coney.bsh.BshBot;
 import cz.malyzajic.coney.java.WebUpdateChecker;
 import cz.malyzajic.coney.php.PhpBot;
@@ -35,13 +33,18 @@ import org.apache.commons.configuration.SubnodeConfiguration;
 public class Coney {
 
     private final List<Bot> bots = new ArrayList<>(5);
-    private static boolean debug = false;
+    public static boolean debug = false;
+    public static boolean autoReconnect = false;
     private static String ircHost = "irc.freenode.net";
     private static Options options;
     private static HierarchicalINIConfiguration botsConfig;
     private final String nick;
     private final String nickLowerCase;
     private final String channelName;
+
+    private IrcConnection ircConnection;
+    private Channel currentChannal;
+    private ConeyListener listener;
 
     public Coney(String nick, String channelName) {
         this.nick = nick;
@@ -62,21 +65,27 @@ public class Coney {
             options.addOption("ch", true, "channel name");
             options.addOption("h", true, "irc host, default irc.freenode.net");
             options.addOption("f", true, "bots INI file");
+            options.addOption("a", false, "automatic reconnect after disconnect");
 
             CommandLineParser parser = new DefaultParser();
             CommandLine line = parser.parse(options, args);
 
             if (line.hasOption("help")) {
-                HelpFormatter formatter = new HelpFormatter();
-                formatter.printHelp("Coney", options);
+                printHelp();
+                return;
             }
             if (line.hasOption("n")) {
                 nick = line.getOptionValue("n");
-                System.out.println("set nick: " + nick);
+                Logger.getLogger(Coney.class.getName()).log(Level.SEVERE, ("set nick: " + nick));
             }
             if (line.hasOption("ch")) {
                 channelName = line.getOptionValue("ch");
             }
+            if (line.hasOption("a")) {
+                Logger.getLogger(Coney.class.getName()).log(Level.SEVERE, "set autoreconnect ON");
+                Coney.autoReconnect = true;
+            }
+
             if (line.hasOption("f")) {
                 String iniString = line.getOptionValue("f");
                 iniFile = new File(iniString);
@@ -87,121 +96,65 @@ public class Coney {
                         Logger.getLogger(Coney.class.getName()).log(Level.SEVERE, null, ex);
                         botsConfig = null;
                     }
-
                 }
-
             }
 
             if (line.hasOption("h")) {
                 Coney.ircHost = line.getOptionValue("h");
-                System.out.println("set host: " + Coney.ircHost);
+                Logger.getLogger(Coney.class.getName()).log(Level.INFO, ("set host: " + Coney.ircHost));
             } else {
-                System.out.println("default host: " + Coney.ircHost);
+                Logger.getLogger(Coney.class.getName()).log(Level.INFO, ("set default host: " + Coney.ircHost));
             }
             if (line.hasOption("d")) {
                 Coney.debug = true;
-                System.out.println("set debug mode ON");
+                Logger.getLogger(Coney.class.getName()).log(Level.INFO, "set debug mode ON");
             }
             if (botsConfig != null && !Utils.isEmpty(nick) && !Utils.isEmpty(channelName)) {
                 Coney app = new Coney(nick, channelName);
                 app.start();
+            } else {
+                printHelp();
             }
 
         } catch (ParseException ex) {
             if (options != null) {
-                HelpFormatter formatter = new HelpFormatter();
-                formatter.printHelp("Coney", options);
+                printHelp();
             }
+            return;
         }
     }
 
+    private static void printHelp() {
+        HelpFormatter formatter = new HelpFormatter();
+        formatter.printHelp("Coney", options);
+    }
+
     private void start() {
+        IrcDebug.setEnabled(Coney.debug);
+        connect(false);
+
+    }
+
+    public void connect(boolean reset) {
+        Logger.getLogger(Coney.class.getName()).log(Level.INFO, "connect reset=" + reset);
+
         try {
+            ircConnection = new IrcConnection(Coney.ircHost);
+            listener = new ConeyListener(this);
+            ircConnection.addMessageListener(listener);
+            ircConnection.setNick(nick);
+            ircConnection.connect();
+            currentChannal = ircConnection.createChannel(channelName);
+            currentChannal.join();
 
-            IrcDebug.setEnabled(Coney.debug);
-            IrcConnection ic = new IrcConnection(Coney.ircHost);
-
-            ic.addMessageListener(new IrcAdaptor() {
-                @Override
-                public void onConnect(IrcConnection irc) {
-
-                }
-
-                @Override
-                public void onPrivateMessage(IrcConnection irc,
-                        User sender,
-                        String message) {
-                    sender.sendMessage("cau, slysim te i soukrome");
-                }
-
-                @Override
-                public void onMessage(IrcConnection irc,
-                        User sender,
-                        Channel target,
-                        String message) {
-                    Bot currentBot = null;
-                    if (message != null && message.toLowerCase().startsWith(nickLowerCase)) {
-                        if ("bots".equals(message.substring(nickLowerCase.length()).trim())) {
-                            StringBuilder str = new StringBuilder();
-                            str.append("Running bots: ");
-                            int i = 0;
-                            for (Bot bot : bots) {
-                                if (i++ != 0) {
-                                    str.append(", ");
-                                }
-                                str.append(bot.getNick());
-                            }
-
-                            target.send(str.toString());
-                            return;
-                        }
-
-                        currentBot = findBot(message.substring(nickLowerCase.length()));
-                        if (currentBot != null) {
-                            String response = currentBot.getResponse(
-                                    message.substring(
-                                            nickLowerCase.length()), sender);
-
-                            if (response != null && !response.isEmpty()) {
-                                target.sendMessage(response);
-                            }
-                        }
-
-                    }
-                    for (Bot bot : bots) {
-                        if (bot.takeAll() && !bot.equals(currentBot)) {
-                            String response = bot.getResponse(message, sender);
-                            if (response != null && !response.isEmpty()) {
-                                target.sendMessage(response);
-                            }
-                        }
-                    }
-                }
-
-            });
-
-            ic.setNick(nick);
-            ic.connect();
-            Channel labka = ic.createChannel(channelName);
-            labka.join();
-            createAndPrepareBots(labka);
+            if (reset) {
+                bots.clear();
+            }
+            createAndPrepareBots(currentChannal);
         } catch (IOException | NickNameException | PasswordException ex) {
             Logger.getLogger(Coney.class.getName()).log(Level.SEVERE, null, ex);
         }
 
-    }
-
-    private Bot findBot(String message) {
-        Bot result = null;
-        if (message != null) {
-            for (Bot bot : bots) {
-                if (message.trim().toLowerCase().startsWith(bot.getName())) {
-                    result = bot;
-                    break;
-                }
-            }
-        }
-        return result;
     }
 
     private void createAndPrepareBots(Channel labka) {
@@ -272,4 +225,17 @@ public class Coney {
 
         return bot;
     }
+
+    public String getNick() {
+        return nick;
+    }
+
+    public String getNickLowerCase() {
+        return nickLowerCase;
+    }
+
+    public List<Bot> getBots() {
+        return bots;
+    }
+
 }
