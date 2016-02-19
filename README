@@ -26,3 +26,11 @@ INI files example:
 [webUpdateChacker]
     ; kontroluje zmeny na Labka.cz ... co 2 minuty
     type = web
+
+
+Build
+**********
+1) Install Maven
+2) Run "mvn package" in Coney directory 
+3) maven generates target directory with jar files
+
